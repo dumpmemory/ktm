@@ -1,78 +1,57 @@
 """
 Efficient implementation of knowledge tracing machines using scikit-learn.
 
-Currently: will not work on wins and fails > 1.
+There are various things that may explain why it cannot be directly applied to
+tabular data.
+Wins and fails are continuous features, not categorical data, so they should
+not be one-hot encoded.
+Cf. encode.py to see how they are encoded.
+
+Factorization machines in their MCMC version cannot be implemented as sklearn
+estimators because predictions are made at each epoch of training then
+averaged.
+It is some kind of stochastic averaging.
+
+Author: Jill-Jênn Vie, 2025
 """
 import argparse
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder
+from pathlib import Path
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import cross_validate, GroupShuffleSplit
+from sklearn.model_selection import cross_validate, GroupShuffleSplit, KFold
+from scipy.sparse import load_npz
 import pandas as pd
+# from fm import FMClassifier
 
 
 parser = argparse.ArgumentParser(description='Run simple KTM')
 parser.add_argument(
     'csv_file', type=str, nargs='?', default='data/dummy/data.csv')
-parser.add_argument('--model', type=str, nargs='?', default='iswf')
+parser.add_argument('--feat', type=str, nargs='?', default='iswf')
 options = parser.parse_args()
 
 
+folder = Path(options.csv_file).parent
 df = pd.read_csv(options.csv_file)
-pipe = Pipeline([
-    ('onehot', OneHotEncoder(handle_unknown='ignore')),
-    ('lr', LogisticRegression(solver='liblinear', C=1e-1, max_iter=300))
-])
+model = LogisticRegression(solver='liblinear')
+# C=1e10 would be unregularized, max_iter=300 if slow
+# model = FMClassifier(embedding_size=5, nb_iterations=200)
+dataset = load_npz(folder / f'X-{options.feat}.npz')
 
 
-cv = GroupShuffleSplit(n_splits=5, random_state=42)
+cv = GroupShuffleSplit(n_splits=5, random_state=42)  # Strong gen
+# cv = KFold(n_splits=5, shuffle=True, random_state=42)  # If weak gen
 METRICS = ['accuracy', 'roc_auc', 'neg_log_loss']
-if options.model == 'irt':
-    FEATURES = ['user', 'item']
-elif options.model == 'pfa':
-    FEATURES = ['skill', 'wins', 'fails']
-else:
-    FEATURES = ['item', 'skill', 'wins', 'fails']
+
+# If one wants to verify that y-{feat}.npy agrees with df['correct']
+# truth = np.load(options.target)
+# assert all(df['correct'].values == truth)
 
 cv_results = cross_validate(
-    pipe, df[FEATURES], df['correct'],
+    model, dataset, df['correct'],
     scoring=METRICS,  # Use all scores
     return_train_score=True, n_jobs=-1,  # Use all cores
     cv=cv, groups=df['user'], verbose=10
 )
 for metric in METRICS:
-    print(metric, cv_results[f"test_{metric}"].mean())
-
-
-for i_train, i_test in cv.split(df, groups=df['user']):
-    df_train = df.iloc[i_train]
-    df_test = df.iloc[i_test]
-
-    # IRT
-    pipe.fit(df_train[['user', 'item']], df_train['correct'])
-    print(pipe.predict_proba(df_test[['user', 'item']])[:, 1])
-
-    # PFA
-    pipe.fit(df_train[['skill', 'wins', 'fails']], df_train['correct'])
-    print(pipe.predict_proba(df_test[['skill', 'wins', 'fails']])[:, 1])
-    break
-
-print('Full training PFA')
-pipe.fit(df[['skill', 'wins', 'fails']], df['correct'])
-print(pipe['lr'].coef_)
-
-print('Full training UISWF')
-pipe.fit(df[['user', 'item', 'skill', 'wins', 'fails']], df['correct'])
-
-# Test for dummy dataset
-coef = pipe['lr'].coef_[0]
-print(coef.shape)
-print(coef)
-print(df.nunique())
-nb = [5, 2, 2, 1, 2]
-print(sum(nb))
-print('Users', coef[:5])
-print('Items', coef[5:7])
-print('Skills', coef[7:9])
-print('Wins', coef[9:10])
-print('Fails', coef[10:12])
+    print(metric, cv_results[f"test_{metric}"],
+          cv_results[f"test_{metric}"].mean())

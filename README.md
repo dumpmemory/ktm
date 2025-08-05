@@ -20,11 +20,11 @@ Authors: [Jill-Jênn Vie](https://jjv.ie), [Hisashi Kashima](https://hkashima.gi
 
 ## Follow our tutorial
 
-Presented at the [Optimizing Human Learning](https://humanlearn.io) workshop in Kingston, Jamaica on June 4, 2019.
+Presented at the [Optimizing Human Learning](https://jilljenn.github.io/humanlearn) workshop in Kingston, Jamaica on June 4, 2019.
 
 Slides from the tutorial are available [here](https://jjv.ie/slides/tuto.pdf). A Jupyter notebook will be available "soon" on Binder.
 
-The tutorial makes you play with the models to assess **weak generalization**. To assess **strong generalization** and reproduce the experiments of the paper, you may want to use scikit-learn's [GroupShuffleSplit](https://scikit-learn.org/stable/modules/cross_validation.html#group-shuffle-split).
+The tutorial makes you play with the models to assess **weak generalization**. To assess **strong generalization** and reproduce the experiments of the paper, you may want to use scikit-learn's [GroupShuffleSplit](https://scikit-learn.org/stable/modules/cross_validation.html#group-shuffle-split), cf. the [sktm.py](sktm.py) file.
 
 ## Install
 
@@ -64,35 +64,6 @@ you should run `encode_tw.py` instead of this file, with the `--pfa` option for 
 
 ## Running
 
-### NEW! 2024 update: efficient scikit-learn implementation
-
-Are you excited? If so, check <sktm.py>.
-
-```python
-pipe = Pipeline([
-    ('onehot', OneHotEncoder(handle_unknown='ignore')),
-    ('lr', LogisticRegression(solver='liblinear'))
-])
-
-# IRT
-pipe.fit(df_train[['user', 'item']], df_train['correct'])
-print(pipe.predict_proba(df_test[['user', 'item']]))
-
-# PFA
-pipe.fit(df_train[['skill', 'wins', 'fails']], df_train['correct'])
-print(pipe.predict_proba(df_test[['skill', 'wins', 'fails']]))
-```
-
-sktm contains efficient parallel cross validation over 5 folds, stratified by group (i.e. strong generalization).
-
-Usage:
-
-    mkdir data/assistments09
-    wget https://jiji.cat/weasel2018/data.csv -P data/assistments09
-    python sktm.py data/assistments09/data.csv --model (irt|pfa|sktm)  # Choose which model
-
-For factorization machines, replace `LogisticRegression` with `from fm import FMClassifier`.
-
 ### Available datasets
 
 - [Assistments 2009](https://sites.google.com/site/assistmentsdata/home/2009-2010-assistment-data)
@@ -115,6 +86,7 @@ For factorization machines, replace `LogisticRegression` with `from fm import FM
 
     python encode.py --users --items  # To get the encodings (npz)
     python lr.py data/dummy/X-ui.npz  # To get results (txt)
+    python sktm.py data/dummy/data.csv --feat ui  # Will be faster
 
 You can also download the [Assistments 2009 dataset](https://jiji.cat/weasel2018/data.csv) into `data/assistments09` and change the dataset:
 
@@ -151,50 +123,21 @@ For factorization machines of size *d* = 5:
 
 The following code does not work if you don't have user_id as column in CSV file.
 
-NEW! For an online MIRT model:
-
-    python omirt.py --d 0 data/assist09/needed.csv  # Will load LR: coef0.npy
-	python omirt.py --d 5 data/assist09/needed.csv  # Will load FM: w.npy and V.npy
-
-	# Will train a IRT model on Fraction dataset with learning rate 0.01
-	python omirt.py --d 0 data/fraction/needed.csv --lr 0.01 --lr2 0.
-
-NEW! For an IRT or deeper model with Keras, for batching and early stopping:
-
-    python dmirt.py data/assist09/needed.csv
-
-It will also create a model.png file with the architecture (here just IRT with L2 regularization):
-
-![](model.png)
-
 ## Results
-
-### Weak generalization
-
-Those numbers may change according to your random state seed.
-
-On the Assistments 2009 dataset:
-
-| AUC time    | users + items  | skills + wins + fails | items + skills + wins + fails |
-|:------------|:---------------|:----------------------|:------------------------------|
-| LR          | **0.734** (IRT) 2s | 0.651 (PFA) 9s        | 0.737 23s                     |
-| FM *d* = 20 | 0.730 2min9s   | **0.652** 43s             | **0.739** 2min30s                 |
-
-Computation times are given for a i7 with 2.6 GHz, with 200 epochs of FM training.
 
 ### Strong generalization
 
 On the Assistments 2009 dataset:
 
-| Model | Dimension | AUC | Improvement |
+| Model | Dimension | AUC | Note |
 |:-----:|:---------:|:---:|:-----------:|
 | KTM: items, skills, wins, fails, extra | 5 | **0.819** | |
 | KTM: items, skills, wins, fails, extra | 5 | 0.815 | +0.05 |
 | KTM: items, skills, wins, fails | 10 | 0.767 | |
-| KTM: items, skills, wins, fails | 0 | 0.759 | +0.02 |
+| KTM: items, skills, wins, fails | 0 | 0.759 | +0.02; 0.747 in 2025, random seed 42 |
 | (*DKT* (Wilson et al., 2016)) | 100 | 0.743 | +0.05 |
-| IRT: users, items | 0 | 0.691 | |
-| PFA: skills, wins, fails | 0 | 0.685 | +0.07 |
+| IRT: users, items | 0 | 0.691 | 0.678 in 2025, random seed 42 |
+| PFA: skills, wins, fails | 0 | 0.685 | +0.07; 0.703 in 2025, random 42 |
 | AFM: skills, attempts | 0 | 0.616 | |
 
 On the [Duolingo](http://sharedtask.duolingo.com) French dataset:
@@ -214,3 +157,66 @@ We also showed that Knowledge Tracing Machines (Bayesian FMs) got better results
       Title = {{Deep Factorization Machines for Knowledge Tracing}},
       Url = {http://arxiv.org/abs/1805.00356},
       Year = 2018}
+
+### Weak generalization
+
+Those numbers may change according to your random state seed. For the numbers below we used random_state=42 and seed=42 for respectively (multicore) 5-fold cross validation and libfm.
+
+On the Assistments 2009 dataset:
+
+| AUC time    | users + items  | skills + wins + fails | items + skills + wins + fails |
+|:------------|:---------------|:----------------------|:------------------------------|
+| LR          | **0.769** (IRT) 4.2s | 0.704 (PFA) 15s        | 0.747 48s                     |
+| (last) FM *d* = 5 | 0.742 1min14s   | 0.703 54s             | 0.730 1min48s                 |
+| (MCMC) FM *d* = 5 | 0.767 2min23s   | **0.705** 1min2s             | **0.749** 2min50s                 |
+
+Computation times are given for a i5 with 2.6 GHz in performance mode, with 200 epochs of FM training.
+
+## Improvement attempts
+
+### Efficient scikit-learn implementation for IRT
+
+Check [sktm.py](sktm.py).
+
+```python
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.linear_model import LogisticRegression
+
+pipe = Pipeline([
+    ('onehot', OneHotEncoder(handle_unknown='ignore')),
+    ('lr', LogisticRegression(solver='liblinear'))
+])
+
+# IRT
+pipe.fit(df_train[['user', 'item']], df_train['correct'])
+print(pipe.predict_proba(df_test[['user', 'item']]))
+```
+
+sktm contains efficient parallel cross validation over 5 folds, stratified by group (i.e. strong generalization).
+
+Usage:
+
+    mkdir data/assistments09
+    wget https://jiji.cat/weasel2018/data.csv -P data/assistments09  # Basically download it there
+    python sktm.py data/assistments09/data.csv --feat swf  # Choose which model, swf is PFA
+
+For factorization machines, replace `LogisticRegression` with `from fm import FMClassifier`. There is a subtlety, please contact me to know more.
+
+---
+
+For an online MIRT model:
+
+    python omirt.py --d 0 data/assist09/needed.csv  # Will load LR: coef0.npy
+    python omirt.py --d 5 data/assist09/needed.csv  # Will load FM: w.npy and V.npy
+
+    # Will train a IRT model on Fraction dataset with learning rate 0.01
+    python omirt.py --d 0 data/fraction/needed.csv --lr 0.01 --lr2 0.
+
+For an IRT or deeper model with Keras, for batching and early stopping:
+
+    python dmirt.py data/assist09/needed.csv
+
+It will also create a model.png file with the architecture (here just IRT with L2 regularization):
+
+![](model.png)

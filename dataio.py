@@ -4,6 +4,7 @@ Otherwise, it is performed on users.
 """
 from pathlib import Path
 import re
+import logging
 from sklearn.model_selection import KFold
 import pandas as pd
 import numpy as np
@@ -36,6 +37,8 @@ def save_folds(full, nb_folds=5):
             full.query('user in @test_users').sort_values(
                 'timestamp').index.to_numpy()
         ))
+        logging.warning('Checksum train %d test %d',
+                        train_users.sum(), test_users.sum())
     return folds
 
 

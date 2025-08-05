@@ -1,5 +1,8 @@
 """
 Logistic regression on sparse features
+
+If you are looking for speed, prefer sktm.py
+If you prefer logging metrics to JSON, this file is better.
 """
 import argparse
 from datetime import datetime
@@ -26,14 +29,6 @@ options = parser.parse_args()
 df, X_file, folder, y_file, y_pred_file = get_paths(options, 'LR')
 
 
-if '_en' in folder.name:
-    df['group'] = df['country'].map(
-        lambda country: 1 if country in {'US', 'CA', 'GB', 'AU'} else 0)
-    group_size = df.query('fold == "train"')['group'].value_counts()
-    print(group_size)
-    df['weight'] = df['group'].map(lambda group: 1 / group_size.loc[group])
-    print(df[['group', 'weight']].head())
-
 X_sp = load_npz(X_file).tocsr()
 nb_samples, _ = X_sp.shape
 y_np = np.load(y_file).astype(np.int32)
@@ -45,12 +40,10 @@ for i, (i_train, i_test) in enumerate(load_folds(options, df)):
     X_train, X_test, y_train, y_test = (X_sp[i_train], X_sp[i_test],
                                         y_np[i_train], y_np[i_test])
     model = LogisticRegression(solver='liblinear')
-    # Has L2 regularization by default
+    # Has L2 regularization C=1 by default
     dt = time.time()
-
     nb_samples = len(y_train)
 
-    # , df.query('fold != "test"')['weight']
     model.fit(X_train, y_train)
 
     print('[time] Training', time.time() - dt, 's')

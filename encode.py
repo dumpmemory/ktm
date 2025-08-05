@@ -23,7 +23,7 @@ as we use hstack below to concatenate sparse matrices.
 
 See paper: https://arxiv.org/abs/1811.03388
 
-Authors: Jill-Jênn Vie, 2024
+Author: Jill-Jênn Vie, 2024
 """
 import argparse
 import logging
