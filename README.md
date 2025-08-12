@@ -2,6 +2,8 @@
 
 # Knowledge Tracing Machines
 
+![](ktm.png)
+
 - Presented at the AAAI 2019 conference in Honolulu, Hawaii on January 27, 2019 [[arXiv]](https://arxiv.org/abs/1811.03388) [[slides]](https://jiji.cat/slides/aaai2019-ktm-slides.pdf).
 - Applied in the [Best Paper Award](https://arxiv.org/abs/1905.06873) of the EDM 2019 conference in Montreal, Canada on July 2, 2019.
 
